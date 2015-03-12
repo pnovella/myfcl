@@ -1,0 +1,134 @@
+/// Mainly copied from demo_0.fcl and Ex01 in the workbook
+
+#include "sensorproperties.fcl"
+#include "databaseutil.fcl"
+
+process_name: RAWINPUTTEST
+
+services : {
+	 TFileService : { fileName : "testHist.root"}
+	 user:  {}
+}
+
+services.user.SensorProperties: @local::standard_sensorproperties
+services.user.DatabaseUtil: @local::standard_databaseutil
+services.user.DatabaseUtil.DBConfigFileName: "/home/pnovella/.my.cnf"
+
+source : {
+       module_type : RawDataInput
+       maxEvents : 1000000
+       fileNames : [ "/data4/NEXT/users/pnovella/DATA/run_3200.gdc1.000.next1el" ]
+       ## Values specific to RawDataInput
+       PMTInstance : pmtRawDigits
+       SIPMInstance : sipmRawDigits
+}
+
+physics : {
+
+	producers : {
+		zeroPM : {
+		       module_type : ZeroSuppressionConverter
+		       tag : "rawdata:pmtRawDigits"
+		       outputInstance : pmtZeroed
+		       filter : Mean
+		       convMode : 0
+		       minTime : 0
+		       maxTime : 50
+		}
+		zeroSI : {
+		       module_type : ZeroSuppressionConverter
+		       tag : "rawdata:sipmRawDigits"
+		       outputInstance : sipmZeroed
+		       filter : Mean
+		       convMode : 0
+		       minTime : 0
+		       maxTime : 50
+		}
+		avPM : {
+		     module_type : DigitAverage
+		     tag : "zeroPM:pmtZeroed"
+		     outputInstance : pmtAverage
+		}
+		peakMap : {
+			module_type : PeakMapper
+			tags : {
+			     s1peak : "makePeak:s1peaks"
+			     s2peak : "makePeak:s2peaks"
+			     pmDgt : "zeroPM:pmtZeroed"
+			     siDgt : "zeroSI:sipmZeroed"
+			}
+			s1Instance : s1pmap
+			s2Instance : s2pmap
+			thrshMet : 2
+			thrshLevel : 99
+			doFilter : true
+                        pdfFile : "/home/pnovella/NEXT/Releases/NEXT_HEAD/sources/detsim/detsim/Utilities/NoiseSiPM.root"
+		}
+	}
+	filters : {
+		makePeak : {
+			 module_type : PeakFinder
+			 tag : "avPM:pmtAverage"
+			 s1Instance : s1peaks
+			 s2Instance : s2peaks
+			 s1SampleWidth : 0.1
+			 s2SampleWidth : 1.
+			 s1Nsig : 5.
+			 s2Nsig : 10.
+			 s1TimeLimits : [ 95., 105. ]
+			 s2TimeLimits : [ 105., 405. ]
+			 s1ChargeLimits : [ 1., 1000000. ]
+			 s2ChargeLimits : [ 10., 1000000. ]
+			 s1WidthLimits : [ 0.2, 2. ]
+			 s2WidthLimits : [ 3., 300. ]
+			 maxPeaks : 100
+		}
+	}
+
+	analyzers : {
+	
+                dstbuilder : {
+                     module_type: DstArtBuilder 
+                     fileName: "/data4/NEXT/users/pnovella/DATA/DST_Na22_3200_000.root"
+                     SaveWaveforms: 1
+                     RawWaveforms: 1
+                     SavePulses: 1
+                     SavePeakMaps: 0
+                     tags : {
+                             pmtRawDigits : "rawdata:pmtRawDigits"
+                             sipmRawDigits : "rawdata:sipmRawDigits"
+			     pmDgt : "zeroPM:pmtZeroed"
+			     siDgt : "zeroSI:sipmZeroed"
+                             s1peak : "makePeak:s1peaks"
+			     s2peak : "makePeak:s2peaks"
+                             s1pmap : "peakMap:s1pmap"
+                             s2pmap : "peakMap:s2pmap"
+			}
+                }
+	}
+
+	prods : [ zeroPM, zeroSI, avPM, makePeak, peakMap ]
+	trigger_paths : [ prods ]
+        outTest : [ dstbuilder, rawOutput ] 
+	end_paths : [ outTest ]
+}
+
+outputs : {
+
+	rawOutput : {
+		  module_type: RootOutput
+        	  fileName: "raw_out_test.root"
+                  SelectEvents : { SelectEvents : [ prods ] }
+		  ## Most efficient way found so far to only save certain products.
+		  outputCommands : [ "keep *_makePeak_*_*", "keep *_peakMap_*_*",
+		  		     "keep *_rawdata_*_*", "drop *_rawdata_pmtRawDigits_*",
+				     "drop *_rawdata_sipmRawDigits_*",
+				     "drop *_zeroPM_*_*", "drop *_zeroSI_*_*",
+				     "drop *_avPM_*_*" ]
+	}
+        #dstbuilder : {
+        #        module_type: DstArtBuilder 
+        #        fileName: "myOutputDST.root"
+        #}
+        
+}

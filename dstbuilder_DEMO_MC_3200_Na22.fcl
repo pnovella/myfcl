@@ -1,0 +1,171 @@
+#include "sensorproperties.fcl"
+#include "simulationproperties.fcl"
+#include "databaseutil.fcl"
+
+process_name: CREATEPEAKMAPS
+
+### Standard S2 generation
+
+services : {
+	 ## Better to give filename on command line with -T option.
+	 TFileService : { fileName : "elHistos.root"}
+}
+
+services.user.SimulationProperties: @local::standard_simulationproperties
+services.user.SensorProperties: @local::standard_sensorproperties
+services.user.DatabaseUtil: @local::standard_databaseutil
+services.user.DatabaseUtil.DBConfigFileName: "/home/pnovella/.my.cnf"
+
+source : {
+       module_type: IreneInput
+       run: 3200
+       startingSubRun: 0
+       max_events: 20
+}
+
+physics: {
+	 prods : [createS2, digitize, simtrigger, averagePMT, makePeaks, mapPeaks ]
+	 end: [ dstbuilder, passDigitization ]
+         end_paths: [ end ]
+	 trigger_paths : [prods]
+	 filters : {
+	 	   createS2 : {
+			module_type : 	ELSignalBuilder
+			tagGet : "nexus"
+			elGeometry: "ELGridDEMO_5mm"
+			elGain: 1050
+			condePolicarpoFactor: 1.	
+			nSensorsCathode: 19
+			nSensorsAnode: 256
+			nSiPMsperDB: 64
+			anodeZpos: 206.
+			debug: false
+			eltablePathCathode: "/data4/NEXT/users/pnovella/ELTableCathode_DEMO_QEdiff.txt"
+			eltablePathAnode: "/data4/NEXT/users/pnovella/ELTableAnode_DEMO.txt"
+			outputInstance: ELHits
+		}
+		   digitize : {
+		   	    module_type : Digitizer
+			    debugMode : false
+		   	    lookuptables : true
+			    outputInstancePMT  : pmtDigits
+			    outputInstanceSiPM : sipmDigits
+			    eventDuration : 819.
+			    samplingTimeCathode : 0.1
+			    samplingTimeAnode : 1
+			    nSensorsCathode: 19
+			    nSensorsAnode: 256
+			    triggerIndexCathode: 4000.
+			    triggerIndexAnode: 400.
+			    calibrationConst : true
+			    gainSigmaCathode : 0.60 
+			    gainSigmaAnode : 0.01
+			    shapingVector : [0.0807388, 1.75041, 4.96473, 6.07965, 5.30849, 4.08415, 3.02732, 2.2437, 1.6872, 1.29352]
+	                    siPMNoisePDF : true
+                            pedRMSCathode : .001
+                            pedRMSAnode : 1
+			    pdfFileName : "/home/pnovella/NEXT/Releases/NEXT_HEAD/sources/detsim/detsim/Utilities/PDFs.root"
+			    calFileName : "/home/pnovella/NEXT/Releases/NEXT_HEAD/sources/detsim/detsim/Utilities/PMCal_3190.root"
+			    fakeS1 : false
+			    tags : {
+			    	 elhit : "createS2:ELHits"
+				 irene : "nexus"
+			    }
+                }
+
+		simtrigger: {
+		module_type :	TriggerSim
+		 tags : {
+		      digit : "digitize:pmtDigits"
+                  }
+		      triggerChannel : 29
+		      eventDuration : 819.		
+		      nSigmas : 5
+		      maxWidth : 50
+		      maxHeight : 500.
+		      qMin : 78.
+		      qMax : 744.
+		      resampleMC : 4
+		      ratioDataMC : 1		
+                 }
+	          makePeaks : {
+		            module_type : PeakFinder
+		            tag : "averagePMT:pmAvDigits"
+		            s1Instance : s1peaks
+		            s2Instance : s2peaks
+		            s1SampleWidth : 0.1
+	                    s2SampleWidth : 1
+		            s1Nsig : 5.
+		            s2Nsig : 5.
+		            s1TimeLimits : [ 390., 410. ]
+		            s2TimeLimits : [ 410., 800. ]
+		            s1ChargeLimits : [ .5, 1000000. ]
+		            s2ChargeLimits : [ 10., 1000000. ]
+		            s1WidthLimits : [ 0., 2. ]
+		            s2WidthLimits : [ 2., 300. ]
+		            maxPeaks : 100
+               	}
+        }
+
+		
+	 producers : {
+		   averagePMT : {
+		           module_type : DigitAverage
+		           tag : "digitize:pmtDigits"
+		           outputInstance : pmAvDigits
+	        }
+        	   mapPeaks : {
+		           module_type : PeakMapper
+		           s1Instance : s1pmaps
+		           s2Instance : s2pmaps
+		           thrshMet : 2
+	                   thrshLevel : 99
+		           doFilter : true
+			   pdfFile : "/home/pnovella/NEXT/Releases/NEXT_HEAD/sources/detsim/detsim/Utilities/NoiseSiPM.root"
+		           tags : {
+		             s1peak : "makePeaks:s1peaks"
+		             s2peak : "makePeaks:s2peaks"
+		              pmDgt : "digitize:pmtDigits"
+		              siDgt : "digitize:sipmDigits"
+		           }			
+			
+        	}
+         }
+
+         analyzers: {
+
+                   dstbuilder : {
+                     module_type: DstArtBuilder 
+                     fileName: "/data4/NEXT/users/pnovella/DATA/myOutputMCDST.root"
+                     SaveWaveforms: 0
+                     RawWaveforms: 0
+                     SavePulses: 0
+                     SavePeakMaps: 0
+                     SaveMCtruth: 1
+                     tags : {
+                             pmDgt : "digitize:pmtDigits"
+                             siDgt : "digitize:sipmDigits"
+                             s1peak : "makePeaks:s1peaks"        
+		             s2peak : "makePeaks:s2peaks"
+                             s1pmap : "mapPeaks:s1pmaps"
+                             s2pmap : "mapPeaks:s2pmaps"
+                             truehit: "nexus"
+			}
+                } 
+         }
+         
+
+}
+
+outputs : {
+
+	passDigitization: {
+	          module_type: RootOutput
+        	  fileName: "out_PMapsTrig.evt.root"
+		  SelectEvents : { SelectEvents : [ prods ] }
+		   ## Only save the high level products: Peaks and PeakMaps and the trigger info.
+		  outputCommands : [ "keep *_makePeaks_*_*", "keep *_mapPeaks_*_*",				    
+				     "drop *_digitize_*_*", "drop *_createS2_*_*",
+				     "drop *_averagePMT_*_*"]
+        }
+}
