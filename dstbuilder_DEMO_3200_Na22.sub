@@ -1,11 +1,11 @@
 
 #PBS -N job_DST_DEMO_3200
-#PBS -q long
+#PBS -q short
 ###PBS -M pau.novella@ific.uv.es
-#PBS -e /data4/NEXT/users/pnovella/fcl/DST_DEMO_3200.err
-#PBS -o /data4/NEXT/users/pnovella/fcl/DST_DEMO_3200.out
+#PBS -e /data4/NEXT/users/pnovella/jobs/logs/DST_DEMO_3200.err
+#PBS -o /data4/NEXT/users/pnovella/jobs/logs/DST_DEMO_3200.out
 #PBS -m bae
 
 source /home/pnovella/NEXT/Releases/NEXT_HEAD/setup.sh
 
-art -c /data4/NEXT/users/pnovella/fcl/dstbuilder_DEMO_3200_Na22.fcl
+art -c /data4/NEXT/users/pnovella/jobs/fcl/dstbuilder_DEMO_3200_Na22.fcl

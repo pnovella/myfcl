@@ -17,7 +17,7 @@ services.user.DatabaseUtil.DBConfigFileName: "/home/pnovella/.my.cnf"
 source : {
        module_type : RawDataInput
        maxEvents : 10000000
-       fileNames : [ "/data4/NEXT/users/pnovella/DATA/run_3200.gdc1.008.next1el" ]
+       fileNames : [ "INPUT_DATA" ]
        ## Values specific to RawDataInput
        PMTInstance : pmtRawDigits
        SIPMInstance : sipmRawDigits
@@ -89,10 +89,9 @@ physics : {
 	
                 dstbuilder : {
                      module_type: DstArtBuilder 
-                     fileName: "/data4/NEXT/users/pnovella/DATA/DST_Na22_3200_008.root"
+                     fileName: "OUTPUT_DATA"
                      SaveWaveforms: 1
-                     RawWaveforms: 1
-                     SavePulses: 1
+                     SavePulses: 0
                      SavePeakMaps: 0
                      tags : {
                              pmtRawDigits : "rawdata:pmtRawDigits"
